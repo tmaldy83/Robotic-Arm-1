@@ -1,0 +1,86 @@
+import time
+from adafruit_pca9685 import PCA9685
+from board import SCL, SDA
+import busio
+
+# Initialize I2C and PCA9685
+i2c = busio.I2C(SCL, SDA)
+pca = PCA9685(i2c)
+pca.frequency = 50  # Set frequency to 50Hz for servos
+
+# Servo calibration
+MIN_ANGLE = 0     # Minimum angle for the servo
+MAX_ANGLE = 180   # Maximum angle for the servo
+MIN_PWM = 150     # Minimum PWM pulse length
+MAX_PWM = 600     # Maximum PWM pulse length
+
+# Map angle to PWM
+def angle_to_pwm(angle):
+    return int(MIN_PWM + (angle - MIN_ANGLE) * (MAX_PWM - MIN_PWM) / (MAX_ANGLE - MIN_ANGLE))
+
+# Move servo to a specific angle
+def move_servo(joint, angle):
+    if 0 <= joint <= 6 and MIN_ANGLE <= angle <= MAX_ANGLE:
+        pwm_value = angle_to_pwm(angle)
+        pca.channels[joint].duty_cycle = int(pwm_value * 65535 / 4096)  # Convert to 16-bit duty cycle
+        print(f"Moving joint {joint} to angle {angle}° (PWM: {pwm_value})")
+    else:
+        print("Invalid joint or angle.")
+
+# Lift an object 1 cm
+def lift_1cm():
+    print("Executing 1 cm lift sequence...")
+
+    # Example starting positions (adjust as per your setup)
+    initial_positions = [
+        (0, 90),  # Base joint neutral
+        (1, 90),  # Lower arm neutral
+        (2, 90),  # Middle arm neutral
+        (3, 90),  # Wrist neutral
+        (4, 90),  # Gripper open
+    ]
+
+    # Move to initial positions
+    for joint, angle in initial_positions:
+        move_servo(joint, angle)
+        time.sleep(0.5)
+
+    # Simulate gripping the object
+    print("Gripping object...")
+    move_servo(4, 30)  # Close gripper
+    time.sleep(1)
+
+    # Adjust the middle arm to lift the object by 1 cm
+    print("Lifting object by 1 cm...")
+    move_servo(2, 85)  # Slight adjustment to lift 1 cm
+    time.sleep(1)
+
+    # Reset to initial positions
+    print("Returning to initial positions...")
+    for joint, angle in initial_positions:
+        move_servo(joint, angle)
+        time.sleep(0.5)
+
+# Main loop
+try:
+    print("Robotic Arm Control")
+    while True:
+        print("\nOptions:")
+        print("1. Lift Object by 1 cm")
+        print("2. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == "1":
+            lift_1cm()
+        elif choice == "2":
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+except KeyboardInterrupt:
+    print("\nExiting...")
+finally:
+    # Turn off all servos
+    for i in range(7):
+        pca.channels[i].duty_cycle = 0
+    pca.deinit()
